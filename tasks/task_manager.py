@@ -13,6 +13,20 @@ Her fonksiyonun pass kısmını doldur. Testleri çalıştır, hepsi geçene kad
 iterate et: `python watch.py` veya `pytest tests/test_question.py -v`
 """
 
+import numpy as np
+import pandas as pd
+from sklearn.datasets import fetch_openml
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score,
+    confusion_matrix,
+)
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 
 # 1. Veri setini yükle
 def load_mushroom_data():
@@ -30,7 +44,11 @@ def load_mushroom_data():
     - X = data.data, y = data.target
     - fetch_openml otomatik cache'ler (~/scikit_learn_data) — internet tek sefer gerekir.
     """
-    pass
+    
+    data = fetch_openml('mushroom', version=1, as_frame=True)
+    X = data.data
+    y = data.target
+    return X, y
 
 
 # 2. Veriyi keşfet
@@ -56,7 +74,16 @@ def explore_data(X, y):
     - (y == 'p').sum() → zehirli sayısı
     - list(X.columns) → feature isimleri
     """
-    pass
+    
+    params = y.value_counts()
+    
+    return {
+        "n_samples": len(X),
+        "n_features": len(X.columns),
+        "edible_count": params["e"],
+        "poisonous_count": params["p"],
+        "feature_names": list(X.columns)
+    }
 
 
 # 3. Kategorik feature'ları one-hot encode et
@@ -76,7 +103,8 @@ def encode_features(X):
 
     İpucu: pd.get_dummies(X) — tüm kategorik sütunları otomatik one-hot yapar.
     """
-    pass
+    
+    return pd.get_dummies(X)
 
 
 # 4. Hedefi encode et
@@ -96,7 +124,8 @@ def encode_target(y):
 
     İpucu: liste comprehension veya y.map({'p': 1, 'e': 0}).values
     """
-    pass
+    
+    return y.map({"e": 0, "p": 1}).to_numpy()
 
 
 # 5. Train / test böl
@@ -117,7 +146,8 @@ def split_data(X, y):
 
     İpucu: from sklearn.model_selection import train_test_split
     """
-    pass
+    
+    return train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
 
 
 # 6. Decision Tree eğit
@@ -138,7 +168,10 @@ def train_tree(X_train, y_train, max_depth=5):
     - model = DecisionTreeClassifier(max_depth=max_depth, random_state=42)
     - model.fit(X_train, y_train)
     """
-    pass
+    
+    model = DecisionTreeClassifier(max_depth=max_depth, random_state=42).fit(X_train, y_train)
+    
+    return model
 
 
 # 7. Modeli değerlendir
@@ -160,7 +193,16 @@ def evaluate_model(model, X_test, y_test):
       recall_score, f1_score, confusion_matrix
     - y_pred = model.predict(X_test)
     """
-    pass
+    
+    y_pred = model.predict(X_test)
+    
+    return {
+        "accuracy": accuracy_score(y_test, y_pred),
+        "precision": precision_score(y_test, y_pred),
+        "recall": recall_score(y_test, y_pred),
+        "f1": f1_score(y_test, y_pred),
+        "confusion_matrix": confusion_matrix(y_test, y_pred)
+    }
 
 
 # 8. Feature importance
@@ -185,7 +227,11 @@ def get_feature_importances(model, feature_names, top_n=10):
     - zip(feature_names, importances) → eşleştir
     - sorted(..., key=lambda p: p[1], reverse=True)[:top_n]
     """
-    pass
+    
+    importances = model.feature_importances_
+    pairs = list(zip(feature_names, importances))
+    pairs.sort(key=lambda p: p[1], reverse=True)
+    return pairs[:top_n]
 
 
 # 9. Ağacı çiz
@@ -210,7 +256,11 @@ def plot_decision_tree(model, feature_names, class_names, max_depth=3):
     - plot_tree(model, feature_names=..., class_names=..., max_depth=max_depth,
                 filled=True, rounded=True, ax=ax)
     """
-    pass
+    
+    fig, ax = plt.subplots(figsize=(20, 10))
+    plot_tree(model, max_depth=max_depth, feature_names=feature_names, class_names=class_names)
+    
+    return fig
 
 
 # 10. max_depth tuning
@@ -231,7 +281,16 @@ def tune_max_depth(X_train, X_test, y_train, y_test, depths):
 
     İpucu: her depth için train_tree çağır, sonra accuracy_score hesapla.
     """
-    pass
+    
+    results = {}
+    
+    for depth in depths:
+        model = train_tree(X_train, y_train, depth)
+        score = evaluate_model(model, X_test, y_test)["accuracy"]
+        
+        results[depth] = score
+    
+    return results
 
 
 # 11. Tek mantar tahmini
@@ -253,7 +312,13 @@ def predict_mushroom(model, X_row):
     - pred = int(model.predict(X_row)[0])
     - label = 'zehirli' if pred == 1 else 'yenilebilir'
     """
-    pass
+    
+    y_pred = int(model.predict(X_row)[0])
+    
+    return {
+        "prediction": y_pred,
+        "label": "zehirli" if y_pred == 1 else "yenilebilir"
+    }
 
 
 # 12. Logistic Regression ile kıyas
@@ -278,7 +343,13 @@ def compare_with_lr(X_train, X_test, y_train, y_test):
           LogisticRegression(max_iter=1000).fit(...)
     - ikisinde de accuracy_score(y_test, model.predict(X_test))
     """
-    pass
+    
+    lr_model = LogisticRegression(max_iter=1000).fit(X_train, y_train)
+    
+    return {
+        "decision_tree": evaluate_model(train_tree(X_train, y_train, 5), X_test, y_test)["accuracy"],
+        "logistic_regression": lr_model.score(X_test, y_test)
+    }
 
 
 # 13. Mükemmel (saf) yaprak sayısı — bonus
@@ -300,7 +371,20 @@ def count_perfect_splits(model):
     - saflık: tree.impurity[i] == 0.0
     - tree.node_count → toplam düğüm sayısı
     """
-    pass
+    
+    tree = model.tree_
+    count = 0
+
+    for i in range(tree.node_count):
+        is_leaf = (
+            tree.children_left[i] == -1 and
+            tree.children_right[i] == -1
+        )
+
+        if is_leaf and tree.impurity[i] == 0.0:
+            count += 1
+
+    return count
 
 
 # 14. Tüm pipeline'ı uçtan uca çalıştır
@@ -327,7 +411,40 @@ def run_pipeline():
 
     İpucu: sample = X_test.iloc[[0]] (tek satır DataFrame olarak).
     """
-    pass
+    
+    # 1. Veri yükle (load_mushroom_data)
+    X, y = load_mushroom_data()
+    info = explore_data(X, y)
+    
+    # 2. Feature'ları one-hot encode et (encode_features)
+    X = encode_features(X)
+    
+    # 3. Hedefi encode et (encode_target)
+    y = encode_target(y)
+    
+    # 4. Train/test böl (split_data)
+    X_train, X_test, y_train, y_test = split_data(X, y)
+    
+    # 5. max_depth=5 ile ağaç eğit (train_tree)
+    model = train_tree(X_train, y_train, 5)
+    
+    # 6. Değerlendir (evaluate_model)
+    metrics = evaluate_model(model, X_test, y_test)
+    
+    # 7. Feature importance al (get_feature_importances) → en önemli feature
+    importances = get_feature_importances(model, list(X.columns), 10)
+    
+    # 8. Bir örnek mantar için tahmin yap (predict_mushroom)
+    sample = X_test.iloc[[0]]
+    sample_pred = predict_mushroom(model, sample)
+    
+    return {
+        "n_samples": info["n_samples"],
+        "test_accuracy": metrics["accuracy"],
+        "top_feature": importances[0][0],
+        "top_feature_importance": importances[0][1],
+        "sample_prediction": sample_pred,
+    }
 
 
 if __name__ == "__main__":
